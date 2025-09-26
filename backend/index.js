@@ -3,24 +3,22 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const path = require("path");
-const { Low } = require("lowdb");
-const JSONFile = require("lowdb/node").JSONFile;
+const low = require("lowdb");
+const FileSync = require("lowdb/adapters/FileSync");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 
+const adapter = new FileSync("db.json");
+const db = low(adapter);
+db.defaults({ users: [], messages: [] }).write();
+
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
+
 const DB_FILE = path.join(__dirname, "db.json");
 
-const adapter = new JSONFile(DB_FILE);
-const db = new Low(adapter);
 
-async function ensureDB() {
-  await db.read();
-  db.data = db.data || { users: [], messages: [] };
-  await db.write();
-}
-ensureDB();
+
 
 const app = express();
 app.use(cors());
