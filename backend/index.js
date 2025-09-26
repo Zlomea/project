@@ -5,7 +5,7 @@ const cors = require("cors");
 const path = require("path");
 const { Low } = require("lowdb");
 const JSONFile = require("lowdb/node").JSONFile;
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 
