@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reimagined Chat — General Room</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
+  <style>body{background:linear-gradient(180deg,#0f172a,#071029);} .glass{background:rgba(255,255,255,0.03);backdrop-filter:blur(6px);} .msg-scroll{max-height:60vh;overflow-y:auto;} </style>
+</head>
+<body class="min-h-screen text-slate-100 antialiased">
+  <div id="app" class="min-h-screen flex items-center justify-center p-6">
+    <!-- Login card -->
+    <div id="loginCard" class="w-full max-w-md glass rounded-2xl p-6">
+      <h2 class="text-2xl font-semibold mb-2">Welcome to Reimagined Chat</h2>
+      <p class="text-sm text-slate-300 mb-4">Create an account or sign in to join the General chat room.</p>
+      <div id="authMsg" class="text-sm text-red-400 mb-2"></div>
+      <form id="authForm" class="space-y-3">
+        <input id="inpUsername" placeholder="Username" class="w-full p-3 rounded-xl bg-transparent border border-white/6" required />
+        <input id="inpPassword" placeholder="Password" type="password" class="w-full p-3 rounded-xl bg-transparent border border-white/6" required />
+        <div class="flex gap-3">
+          <button id="loginBtn" type="button" class="flex-1 bg-indigo-600 py-2 rounded-xl">Sign in</button>
+          <button id="registerBtn" type="button" class="flex-1 border border-white/6 py-2 rounded-xl">Register</button>
+        </div>
+      </form>
+      <p class="text-xs text-slate-400 mt-4">Usernames are unique. Passwords are stored hashed (bcrypt).</p>
+    </div>
+
+    <!-- Chat UI (hidden until login) -->
+    <div id="chatUI" class="hidden w-full max-w-4xl glass rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center font-semibold" id="meAvatar">Me</div>
+          <div>
+            <div id="meName" class="font-semibold">—</div>
+            <div class="text-xs text-slate-400">General Chat</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div id="status" class="text-sm text-slate-300">Connecting...</div>
+          <button id="logoutBtn" class="p-2 rounded-lg hover:bg-white/5">Logout</button>
+        </div>
+      </div>
+
+      <div id="messages" class="msg-scroll p-3 bg-transparent rounded-lg h-80 overflow-auto space-y-3 border border-white/6"></div>
+
+      <form id="messageForm" class="flex gap-3 mt-3">
+        <input id="messageInput" class="flex-1 p-3 rounded-2xl bg-transparent border border-white/6" placeholder="Write a message..." autocomplete="off" />
+        <button id="sendBtn" class="bg-indigo-500 px-4 py-2 rounded-2xl text-white">Send</button>
+      </form>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const API_BASE = ""; // same origin
+  let socket = null;
+  let token = localStorage.getItem("chat_token");
+  let me = localStorage.getItem("chat_user");
+
+  const loginCard = document.getElementById("loginCard");
+  const chatUI = document.getElementById("chatUI");
+  const authMsg = document.getElementById("authMsg");
+  const inpUsername = document.getElementById("inpUsername");
+  const inpPassword = document.getElementById("inpPassword");
+  const loginBtn = document.getElementById("loginBtn");
+  const registerBtn = document.getElementById("registerBtn");
+  const meName = document.getElementById("meName");
+  const meAvatar = document.getElementById("meAvatar");
+  const status = document.getElementById("status");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const messagesEl = document.getElementById("messages");
+  const messageForm = document.getElementById("messageForm");
+  const messageInput = document.getElementById("messageInput");
+
+  function showAuthError(msg) { authMsg.textContent = msg; setTimeout(()=> authMsg.textContent="",5000); }
+
+  async function api(path, method="GET", body) {
+    const headers = {"Content-Type":"application/json"};
+    if (token) headers["Authorization"] = "Bearer " + token;
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    return res;
+  }
+
+  async function doRegister() {
+    const username = inpUsername.value.trim();
+    const password = inpPassword.value;
+    if (!username || !password) return showAuthError("username & password required");
+    const res = await api("/api/register","POST",{username,password});
+    const data = await res.json();
+    if (!res.ok) return showAuthError(data.error || "register failed");
+    token = data.token; me = data.user.username;
+    localStorage.setItem("chat_token", token); localStorage.setItem("chat_user", me);
+    openChat();
+  }
+
+  async function doLogin() {
+    const username = inpUsername.value.trim();
+    const password = inpPassword.value;
+    if (!username || !password) return showAuthError("username & password required");
+    const res = await api("/api/login","POST",{username,password});
+    const data = await res.json();
+    if (!res.ok) return showAuthError(data.error || "login failed");
+    token = data.token; me = data.user.username;
+    localStorage.setItem("chat_token", token); localStorage.setItem("chat_user", me);
+    openChat();
+  }
+
+  async function openChat() {
+    if (!token) return;
+    loginCard.classList.add("hidden");
+    chatUI.classList.remove("hidden");
+    meName.textContent = me;
+    meAvatar.textContent = me.slice(0,2).toUpperCase();
+    connectSocket();
+    // load history
+    try {
+      const res = await api("/api/messages","GET");
+      if (res.ok) {
+        const data = await res.json();
+        renderMessages(data.messages || []);
+      }
+    } catch (e) { console.warn(e) }
+  }
+
+  function renderMessages(list) {
+    messagesEl.innerHTML = "";
+    list.forEach(appendMessage);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function appendMessage(m) {
+    const isMe = m.user === me;
+    const wrap = document.createElement("div");
+    wrap.className = "flex " + (isMe ? "justify-end" : "justify-start");
+    if (m.system) {
+      const el = document.createElement("div");
+      el.className = "text-center text-slate-400 text-sm w-full";
+      el.textContent = m.text;
+      messagesEl.appendChild(el);
+      return;
+    }
+    wrap.innerHTML = `
+      <div class="${isMe ? 'bg-indigo-600 text-white' : 'bg-white/4 text-slate-100'} max-w-[80%] p-3 rounded-2xl ${isMe ? 'rounded-br-2xl' : 'rounded-bl-2xl'}">
+        <div class="text-xs text-slate-300 mb-1">${m.user}</div>
+        <div class="text-sm">${m.text}</div>
+        <div class="text-xs text-white/60 mt-1 text-right">${new Date(m.createdAt).toLocaleTimeString()}</div>
+      </div>
+    `;
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function connectSocket() {
+    if (!token) return;
+    status.textContent = "Connecting...";
+    socket = io({ auth: { token } });
+    socket.on("connect", () => { status.textContent = "Connected"; });
+    socket.on("disconnect", () => { status.textContent = "Disconnected"; });
+    socket.on("messages:history", (msgs) => { renderMessages(msgs || []); });
+    socket.on("chat:message", (m) => { appendMessage(m); });
+    socket.on("connect_error", (err) => { status.textContent = "Auth failed"; console.error(err); });
+  }
+
+  messageForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = messageInput.value.trim();
+    if (!text || !socket) return;
+    socket.emit("chat:message", { text });
+    messageInput.value = "";
+  });
+
+  loginBtn.addEventListener("click", doLogin);
+  registerBtn.addEventListener("click", doRegister);
+  logoutBtn.addEventListener("click", () => {
+    localStorage.removeItem("chat_token"); localStorage.removeItem("chat_user");
+    token = null; me = null;
+    if (socket) socket.disconnect();
+    chatUI.classList.add("hidden"); loginCard.classList.remove("hidden");
+  });
+
+  // auto-open if token exists
+  if (token && me) {
+    openChat();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{
+  "users": [
+    {
+      "username": "zlomea",
+      "createdAt": 1758880246831,
+      "lastSeen": 1758880367872
+    },
+    {
+      "username": "zz",
+      "createdAt": 1758880268709,
+      "lastSeen": 1758880283318
+    },
+    {
+      "username": "سشيصش",
+      "createdAt": 1758880472127,
+      "lastSeen": 1758880733537
+    },
+    {
+      "id": "1758882469527",
+      "username": "zlomea2",
+      "passwordHash": "$2b$10$htNfSZm1rsVmj3dYgoX/Pe096c5Ht5OKOMSDGQpIsV2lzE8TcL3Te",
+      "createdAt": 1758882469527,
+      "lastSeen": 1758882920086
+    }
+  ],
+  "rooms": [
+    {
+      "id": "general",
+      "name": "General",
+      "createdAt": 0
+    }
+  ],
+  "messages": [
+    {
+      "id": "1758880252060-43i5f6x",
+      "roomId": "general",
+      "text": "hello",
+      "username": "zlomea",
+      "createdAt": 1758880252060
+    },
+    {
+      "id": "1758880272123-tn6jdum",
+      "roomId": "general",
+      "text": "sdawd",
+      "username": "zz",
+      "createdAt": 1758880272123
+    },
+    {
+      "id": "1758880487695-ll3dkfm",
+      "roomId": "general",
+      "text": "dawds",
+      "username": "سشيصش",
+      "createdAt": 1758880487695
+    },
+    {
+      "id": "1758882474502",
+      "user": "zlomea2",
+      "text": "hola",
+      "createdAt": 1758882474502
+    }
+  ]
+}
